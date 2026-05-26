@@ -1,0 +1,721 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Reporte de Inspección Policial</title>
+<link href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600;700&family=Barlow+Condensed:wght@600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --navy:#0a1628;--navy-mid:#12234a;--navy-light:#1e3a6e;
+    --gold:#c9a84c;--gold-light:#e8c97a;--gold-pale:#fdf6e3;
+    --accent:#2563eb;--danger:#dc2626;--success:#16a34a;
+    --bg:#f4f6fa;--surface:#ffffff;--border:#d1d9e8;
+    --text:#0f172a;--text-muted:#64748b;--radius:8px;
+    --shadow:0 2px 12px rgba(10,22,40,0.10);
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:'Barlow',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;padding:0 0 80px}
+
+  /* HEADER */
+  .header{background:linear-gradient(135deg,var(--navy) 0%,var(--navy-mid) 60%,var(--navy-light) 100%);padding:20px 40px 16px;display:flex;align-items:center;justify-content:space-between;border-bottom:3px solid var(--gold);position:sticky;top:0;z-index:100}
+  .header-left{display:flex;align-items:center;gap:16px}
+  .badge{width:50px;height:50px;background:var(--gold);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:20px}
+  .header h1{font-family:'Barlow Condensed',sans-serif;font-size:20px;font-weight:700;color:#fff;letter-spacing:1px;text-transform:uppercase}
+  .header p{font-size:11px;color:var(--gold-light);margin-top:2px}
+  .header-actions{display:flex;gap:6px;flex-wrap:wrap}
+
+  /* BUTTONS */
+  .btn{display:inline-flex;align-items:center;gap:6px;padding:8px 14px;border-radius:var(--radius);font-family:'Barlow',sans-serif;font-size:12px;font-weight:600;cursor:pointer;border:none;transition:all .2s;white-space:nowrap}
+  .btn:hover{transform:translateY(-1px);filter:brightness(1.08)}
+  .btn:active{transform:scale(.97)}
+  .btn svg{width:14px;height:14px;flex-shrink:0}
+  .btn-airtable{background:#18bfff;color:#fff;font-size:13px;padding:9px 18px}
+  .btn-pdf{background:#ef4444;color:#fff}
+  .btn-word{background:#2563eb;color:#fff}
+  .btn-excel{background:#16a34a;color:#fff}
+  .btn-print{background:var(--gold);color:var(--navy)}
+  .btn-clear{background:rgba(255,255,255,.12);color:#fff;border:1px solid rgba(255,255,255,.25)}
+  .btn-submit{background:var(--gold);color:var(--navy);font-size:14px;padding:11px 28px}
+  .btn-airtable-main{background:#18bfff;color:#fff;font-size:14px;padding:11px 24px}
+
+  /* AIRTABLE STATUS BANNER */
+  .at-banner{display:none;padding:10px 20px;font-size:13px;font-weight:600;border-radius:var(--radius);margin:16px 0;align-items:center;gap:10px}
+  .at-banner.loading{background:#eff6ff;color:#1d4ed8;border:1px solid #bfdbfe;display:flex}
+  .at-banner.success{background:#f0fdf4;color:#166534;border:1px solid #bbf7d0;display:flex}
+  .at-banner.error{background:#fef2f2;color:#991b1b;border:1px solid #fecaca;display:flex}
+  .spinner{width:16px;height:16px;border:2px solid currentColor;border-top-color:transparent;border-radius:50%;animation:spin .7s linear infinite;flex-shrink:0}
+  @keyframes spin{to{transform:rotate(360deg)}}
+
+  /* PROGRESS */
+  .at-progress{display:none;background:#f8fafc;border:1px solid var(--border);border-radius:var(--radius);padding:14px 18px;margin:12px 0}
+  .at-progress-label{font-size:12px;font-weight:600;color:var(--text-muted);margin-bottom:8px;text-transform:uppercase;letter-spacing:.5px}
+  .at-progress-bar-wrap{background:#e2e8f0;border-radius:50px;height:8px;overflow:hidden}
+  .at-progress-bar{height:100%;background:linear-gradient(90deg,#18bfff,#0ea5e9);border-radius:50px;transition:width .4s ease;width:0%}
+  .at-progress-steps{margin-top:10px;display:flex;flex-direction:column;gap:4px}
+  .at-step{font-size:12px;color:var(--text-muted);display:flex;align-items:center;gap:6px}
+  .at-step.done{color:var(--success)}
+  .at-step.active{color:#0ea5e9;font-weight:600}
+  .at-step-icon{font-size:13px;width:16px;text-align:center}
+
+  /* CONTAINER */
+  .container{max-width:920px;margin:28px auto;padding:0 24px}
+
+  /* CARD */
+  .card{background:var(--surface);border-radius:12px;box-shadow:var(--shadow);border:1px solid var(--border);overflow:hidden;margin-bottom:20px}
+  .card-header{background:var(--navy);padding:11px 20px;display:flex;align-items:center;gap:10px}
+  .card-header .dot{width:8px;height:8px;border-radius:50%;background:var(--gold);flex-shrink:0}
+  .card-header span{font-family:'Barlow Condensed',sans-serif;font-size:13px;font-weight:700;color:var(--gold-light);text-transform:uppercase;letter-spacing:1px}
+  .card-body{padding:22px 26px}
+
+  /* GRID */
+  .grid-2{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+  .grid-3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px}
+  .span-2{grid-column:span 2}
+  .span-3{grid-column:span 3}
+
+  /* FIELDS */
+  .field{display:flex;flex-direction:column;gap:5px}
+  .field label{font-size:11px;font-weight:600;color:var(--navy-mid);text-transform:uppercase;letter-spacing:.6px}
+  .field input,.field select,.field textarea{padding:9px 12px;border:1.5px solid var(--border);border-radius:var(--radius);font-family:'Barlow',sans-serif;font-size:14px;color:var(--text);background:#fafbfd;transition:border-color .2s,box-shadow .2s;width:100%}
+  .field input:focus,.field select:focus,.field textarea:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px rgba(37,99,235,.12);background:#fff}
+  .field textarea{resize:vertical;min-height:100px;line-height:1.5}
+
+  /* PHOTOS */
+  .photo-grid{display:flex;gap:14px;flex-wrap:wrap}
+  .photo-slot{flex:1;min-width:150px;max-width:210px;border:2px dashed var(--border);border-radius:10px;padding:18px 10px;text-align:center;cursor:pointer;transition:all .2s;position:relative;background:#fafbfd}
+  .photo-slot:hover{border-color:var(--accent);background:#eff6ff}
+  .photo-slot.has-photo{border-style:solid;border-color:var(--gold)}
+  .photo-slot .photo-icon{font-size:26px;margin-bottom:6px}
+  .photo-slot .photo-label{font-size:11px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px}
+  .photo-slot .photo-sub{font-size:10px;color:#94a3b8;margin-top:3px}
+  .photo-slot input[type=file]{position:absolute;inset:0;opacity:0;cursor:pointer}
+  .photo-slot img{width:100%;height:110px;object-fit:cover;border-radius:6px;margin-bottom:6px}
+
+  /* CHECKS */
+  .incidencias-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:9px}
+  .check-item{display:flex;align-items:center;gap:9px;padding:9px 13px;border:1.5px solid var(--border);border-radius:var(--radius);cursor:pointer;transition:all .2s;user-select:none}
+  .check-item:hover{border-color:var(--accent);background:#eff6ff}
+  .check-item.checked{border-color:var(--navy-mid);background:var(--navy-mid)}
+  .check-item.checked .check-label{color:#fff}
+  .check-box{width:17px;height:17px;border-radius:4px;border:2px solid #cbd5e1;background:#fff;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:all .15s}
+  .check-item.checked .check-box{background:var(--gold);border-color:var(--gold)}
+  .check-box svg{display:none}
+  .check-item.checked .check-box svg{display:block}
+  .check-label{font-size:13px;font-weight:500;color:var(--text)}
+
+  /* BADGES */
+  .status-row{display:flex;gap:10px;flex-wrap:wrap;margin-top:14px}
+  .status-badge{display:flex;align-items:center;gap:7px;padding:9px 16px;border-radius:50px;border:2px solid var(--border);cursor:pointer;font-weight:600;font-size:13px;transition:all .2s;user-select:none}
+  .status-badge:hover{border-color:var(--accent)}
+  .status-badge.active-danger{background:#fef2f2;border-color:var(--danger);color:var(--danger)}
+  .status-badge.active-warning{background:#fffbeb;border-color:#d97706;color:#92400e}
+  .status-dot{width:10px;height:10px;border-radius:50%;background:currentColor}
+
+  /* TABLE */
+  .mercancias-table{width:100%;border-collapse:collapse;font-size:13px}
+  .mercancias-table th{background:var(--navy);color:var(--gold-light);padding:8px 11px;text-align:left;font-size:10px;letter-spacing:.8px;text-transform:uppercase}
+  .mercancias-table td{padding:7px 11px;border-bottom:1px solid var(--border)}
+  .mercancias-table tr:hover td{background:#f8fafc}
+  .mercancias-table input{border:none;background:transparent;width:100%;font-family:'Barlow',sans-serif;font-size:13px}
+  .mercancias-table input:focus{outline:1px solid var(--accent);border-radius:4px;padding:2px 4px}
+  .add-row-btn{margin-top:10px;background:none;border:1.5px dashed var(--border);color:var(--text-muted);font-family:'Barlow',sans-serif;font-size:13px;font-weight:600;padding:7px 14px;border-radius:var(--radius);cursor:pointer;transition:all .2s}
+  .add-row-btn:hover{border-color:var(--accent);color:var(--accent)}
+  .del-btn{background:none;border:none;color:#ef4444;cursor:pointer;font-size:15px;padding:2px 5px}
+
+  /* BOTTOM BAR */
+  .bottom-bar{position:fixed;bottom:0;left:0;right:0;background:var(--surface);border-top:1px solid var(--border);padding:12px 40px;display:flex;align-items:center;justify-content:space-between;box-shadow:0 -4px 20px rgba(0,0,0,.08);z-index:90}
+  .status-bar{font-size:13px;color:var(--text-muted)}
+  .status-bar strong{color:var(--navy-mid)}
+
+  /* TOAST */
+  .toast{position:fixed;top:20px;right:24px;background:var(--navy-mid);color:#fff;padding:12px 20px;border-radius:var(--radius);font-size:14px;font-weight:500;box-shadow:var(--shadow);z-index:999;transform:translateY(-60px);opacity:0;transition:all .3s;display:flex;align-items:center;gap:10px}
+  .toast.show{transform:translateY(0);opacity:1}
+  .toast.success{border-left:4px solid var(--gold)}
+  .toast.error{border-left:4px solid #ef4444}
+
+  /* AIRTABLE RECORD LINK */
+  .at-record-link{display:inline-flex;align-items:center;gap:6px;margin-top:6px;color:#0ea5e9;font-size:13px;font-weight:600;text-decoration:none}
+  .at-record-link:hover{text-decoration:underline}
+
+  @media print{
+    body{background:#fff;padding:0}
+    .header,.bottom-bar,.header-actions,.add-row-btn,.del-btn,.at-banner,.at-progress{display:none!important}
+    .container{max-width:100%;padding:0;margin:0}
+    .card{box-shadow:none;border:1px solid #ccc;page-break-inside:avoid}
+    .print-header{display:block!important;text-align:center;padding:20px 0 16px;border-bottom:3px solid #0a1628;margin-bottom:20px}
+    .print-header h1{font-size:20px;text-transform:uppercase;letter-spacing:2px}
+  }
+  .print-header{display:none}
+
+  @media(max-width:640px){
+    .grid-2,.grid-3{grid-template-columns:1fr}
+    .span-2,.span-3{grid-column:span 1}
+    .header{padding:14px 16px;flex-direction:column;align-items:flex-start;gap:10px}
+    .header-actions{width:100%}
+    .container{padding:0 10px}
+    .bottom-bar{padding:10px 16px}
+  }
+</style>
+</head>
+<body>
+
+<div class="print-header"><h1>Reporte de Inspección Policial</h1><p>Documento oficial – uso interno</p></div>
+
+<!-- HEADER -->
+<div class="header">
+  <div class="header-left">
+    <div class="badge">🛡️</div>
+    <div>
+      <h1>Reporte de Inspección Policial</h1>
+      <p>Formulario oficial de registro de incidencias</p>
+    </div>
+  </div>
+  <div class="header-actions">
+    <button class="btn btn-clear" onclick="limpiarFormulario()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6"/></svg>Limpiar
+    </button>
+    <button class="btn btn-print" onclick="window.print()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>Imprimir
+    </button>
+    <button class="btn btn-pdf" onclick="exportarPDF()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>PDF
+    </button>
+    <button class="btn btn-word" onclick="exportarWord()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>Word
+    </button>
+    <button class="btn btn-excel" onclick="exportarExcel()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>Excel
+    </button>
+    <button class="btn btn-airtable" onclick="enviarAirtable()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/></svg>Enviar a Airtable
+    </button>
+  </div>
+</div>
+
+<!-- CONTAINER -->
+<div class="container" id="form-content">
+
+  <!-- AIRTABLE STATUS -->
+  <div class="at-banner" id="atBanner"><div class="spinner"></div><span id="atBannerMsg">Enviando a Airtable...</span></div>
+  <div class="at-progress" id="atProgress">
+    <div class="at-progress-label">Progreso de envío a Airtable</div>
+    <div class="at-progress-bar-wrap"><div class="at-progress-bar" id="atBar"></div></div>
+    <div class="at-progress-steps" id="atSteps"></div>
+  </div>
+
+  <!-- 1. DATOS GENERALES -->
+  <div class="card">
+    <div class="card-header"><div class="dot"></div><span>Datos Generales</span></div>
+    <div class="card-body">
+      <div class="grid-3">
+        <div class="field"><label>Fecha</label><input type="date" id="fecha"></div>
+        <div class="field span-2"><label>Tema / Asunto</label><input type="text" id="tema" placeholder="Descripción del tema de inspección"></div>
+        <div class="field span-2"><label>Nombre del Agente</label><input type="text" id="agente" placeholder="Nombre completo del agente"></div>
+        <div class="field"><label>No. Documento</label><input type="text" id="noDocumento" placeholder="Ej. 12345678"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 2. PERSONA -->
+  <div class="card">
+    <div class="card-header"><div class="dot"></div><span>Datos de la Persona Inspeccionada</span></div>
+    <div class="card-body">
+      <div class="grid-3">
+        <div class="field span-2"><label>Nombre Completo</label><input type="text" id="nombrePersona" placeholder="Nombre y apellidos"></div>
+        <div class="field"><label>No. DPI / Documento</label><input type="text" id="dpi" placeholder="DPI / Pasaporte"></div>
+        <div class="field"><label>Fecha de Nacimiento</label><input type="date" id="fechaNacimiento"></div>
+        <div class="field"><label>Teléfono</label><input type="tel" id="telefono" placeholder="+502 0000-0000"></div>
+        <div class="field"><label>Dirección</label><input type="text" id="direccion" placeholder="Dirección completa"></div>
+      </div>
+      <div style="margin-top:18px">
+        <div class="field" style="margin-bottom:10px"><label>Fotografías de Identificación</label></div>
+        <div class="photo-grid">
+          <div class="photo-slot" id="slot-dpi" onclick="document.getElementById('file-dpi').click()">
+            <input type="file" id="file-dpi" accept="image/*" onchange="loadPhoto(this,'slot-dpi','preview-dpi')">
+            <img id="preview-dpi" style="display:none">
+            <div class="photo-icon">🪪</div><div class="photo-label">DPI</div><div class="photo-sub">Foto del documento</div>
+          </div>
+          <div class="photo-slot" id="slot-licencia" onclick="document.getElementById('file-licencia').click()">
+            <input type="file" id="file-licencia" accept="image/*" onchange="loadPhoto(this,'slot-licencia','preview-licencia')">
+            <img id="preview-licencia" style="display:none">
+            <div class="photo-icon">🚗</div><div class="photo-label">Licencia</div><div class="photo-sub">Licencia de conducir</div>
+          </div>
+          <div class="photo-slot" id="slot-pasaporte" onclick="document.getElementById('file-pasaporte').click()">
+            <input type="file" id="file-pasaporte" accept="image/*" onchange="loadPhoto(this,'slot-pasaporte','preview-pasaporte')">
+            <img id="preview-pasaporte" style="display:none">
+            <div class="photo-icon">📘</div><div class="photo-label">Pasaporte</div><div class="photo-sub">Foto del pasaporte</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 3. VEHÍCULO -->
+  <div class="card">
+    <div class="card-header"><div class="dot"></div><span>Datos del Vehículo</span></div>
+    <div class="card-body">
+      <div class="grid-3">
+        <div class="field"><label>Placa</label><input type="text" id="placa" placeholder="Ej. P-123ABC" style="text-transform:uppercase"></div>
+        <div class="field"><label>Marca / Modelo</label><input type="text" id="marcaModelo" placeholder="Ej. Toyota Hilux"></div>
+        <div class="field"><label>Color</label><input type="text" id="colorVehiculo" placeholder="Ej. Blanco"></div>
+      </div>
+      <div style="margin-top:18px">
+        <div class="field" style="margin-bottom:10px"><label>Foto Documento Vehículo</label></div>
+        <div class="photo-grid">
+          <div class="photo-slot" id="slot-vehiculo" onclick="document.getElementById('file-vehiculo').click()">
+            <input type="file" id="file-vehiculo" accept="image/*" onchange="loadPhoto(this,'slot-vehiculo','preview-vehiculo')">
+            <img id="preview-vehiculo" style="display:none">
+            <div class="photo-icon">📋</div><div class="photo-label">Doc. Vehículo</div><div class="photo-sub">Tarjeta de circulación</div>
+          </div>
+          <div class="photo-slot" id="slot-vehiculo2" onclick="document.getElementById('file-vehiculo2').click()">
+            <input type="file" id="file-vehiculo2" accept="image/*" onchange="loadPhoto(this,'slot-vehiculo2','preview-vehiculo2')">
+            <img id="preview-vehiculo2" style="display:none">
+            <div class="photo-icon">🚙</div><div class="photo-label">Foto Vehículo</div><div class="photo-sub">Vista frontal o lateral</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 4. MERCANCÍAS -->
+  <div class="card">
+    <div class="card-header"><div class="dot"></div><span>Tipo de Mercancía</span></div>
+    <div class="card-body">
+      <table class="mercancias-table">
+        <thead><tr><th>Descripción</th><th>Cantidad</th><th>Unidad</th><th>Observaciones</th><th style="width:36px"></th></tr></thead>
+        <tbody id="mercanciasBody">
+          <tr>
+            <td><input type="text" placeholder="Tipo de mercancía"></td>
+            <td><input type="number" placeholder="0" style="width:70px"></td>
+            <td><input type="text" placeholder="Unidad" style="width:70px"></td>
+            <td><input type="text" placeholder="Observaciones"></td>
+            <td><button class="del-btn" onclick="delRow(this)">✕</button></td>
+          </tr>
+        </tbody>
+      </table>
+      <button class="add-row-btn" onclick="addRow()">+ Agregar fila</button>
+    </div>
+  </div>
+
+  <!-- 5. INCIDENCIAS -->
+  <div class="card">
+    <div class="card-header"><div class="dot"></div><span>Incidencias</span></div>
+    <div class="card-body">
+      <div class="field" style="margin-bottom:14px">
+        <label>Tipo de Incidencia</label>
+        <div class="incidencias-grid" id="incidenciasGrid">
+          <div class="check-item" onclick="toggleCheck(this)"><div class="check-box"><svg width="11" height="9" viewBox="0 0 11 9" fill="none" stroke="#0a1628" stroke-width="2.2"><polyline points="1 4.5 4 7.5 10 1"/></svg></div><span class="check-label">Contrabando</span></div>
+          <div class="check-item" onclick="toggleCheck(this)"><div class="check-box"><svg width="11" height="9" viewBox="0 0 11 9" fill="none" stroke="#0a1628" stroke-width="2.2"><polyline points="1 4.5 4 7.5 10 1"/></svg></div><span class="check-label">Narcóticos</span></div>
+          <div class="check-item" onclick="toggleCheck(this)"><div class="check-box"><svg width="11" height="9" viewBox="0 0 11 9" fill="none" stroke="#0a1628" stroke-width="2.2"><polyline points="1 4.5 4 7.5 10 1"/></svg></div><span class="check-label">TPR</span></div>
+          <div class="check-item" onclick="toggleCheck(this)"><div class="check-box"><svg width="11" height="9" viewBox="0 0 11 9" fill="none" stroke="#0a1628" stroke-width="2.2"><polyline points="1 4.5 4 7.5 10 1"/></svg></div><span class="check-label">Migratorio</span></div>
+          <div class="check-item" onclick="toggleCheck(this)"><div class="check-box"><svg width="11" height="9" viewBox="0 0 11 9" fill="none" stroke="#0a1628" stroke-width="2.2"><polyline points="1 4.5 4 7.5 10 1"/></svg></div><span class="check-label">Orden de Captura</span></div>
+          <div class="check-item" onclick="toggleCheck(this)"><div class="check-box"><svg width="11" height="9" viewBox="0 0 11 9" fill="none" stroke="#0a1628" stroke-width="2.2"><polyline points="1 4.5 4 7.5 10 1"/></svg></div><span class="check-label">Armas</span></div>
+          <div class="check-item" onclick="toggleCheck(this)"><div class="check-box"><svg width="11" height="9" viewBox="0 0 11 9" fill="none" stroke="#0a1628" stroke-width="2.2"><polyline points="1 4.5 4 7.5 10 1"/></svg></div><span class="check-label">Precursores</span></div>
+          <div class="check-item" onclick="toggleCheck(this)"><div class="check-box"><svg width="11" height="9" viewBox="0 0 11 9" fill="none" stroke="#0a1628" stroke-width="2.2"><polyline points="1 4.5 4 7.5 10 1"/></svg></div><span class="check-label">Otros</span></div>
+        </div>
+      </div>
+      <div class="status-row">
+        <div class="status-badge" id="badge-incautacion" onclick="toggleBadge('incautacion','warning')"><div class="status-dot"></div>Incautación</div>
+        <div class="status-badge" id="badge-detenidos" onclick="toggleBadge('detenidos','danger')"><div class="status-dot"></div>Detenidos</div>
+      </div>
+      <div class="grid-2" style="margin-top:16px">
+        <div class="field"><label>No. Incautados</label><input type="number" id="numIncautados" placeholder="0" min="0"></div>
+        <div class="field"><label>No. Detenidos</label><input type="number" id="numDetenidos" placeholder="0" min="0"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 6. NARRACIÓN -->
+  <div class="card">
+    <div class="card-header"><div class="dot"></div><span>Narración de la Incidencia</span></div>
+    <div class="card-body">
+      <div class="field">
+        <label>Descripción detallada</label>
+        <textarea id="narracion" placeholder="Describa con detalle los hechos ocurridos durante la inspección…"></textarea>
+      </div>
+    </div>
+  </div>
+
+</div><!-- /container -->
+
+<!-- BOTTOM BAR -->
+<div class="bottom-bar">
+  <div class="status-bar">Formulario: <strong id="statusLabel">Sin completar</strong></div>
+  <div style="display:flex;gap:8px">
+    <button class="btn btn-airtable-main" onclick="enviarAirtable()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:15px;height:15px"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/></svg>
+      Enviar a Airtable ↗
+    </button>
+    <button class="btn btn-submit" onclick="exportarPDF()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:15px;height:15px"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+      Exportar PDF
+    </button>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<!-- LIBS -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+
+<script>
+/* ═══════════════════════════════
+   CONFIGURACIÓN AIRTABLE
+═══════════════════════════════ */
+const AT_TOKEN  = 'patRqKtvTmhjQv4Po.9972c0d73fb21c5949e0232a5900a1f512c6db56920e15c176a25fe2e0ff39c9';
+const AT_BASE   = 'appr1hXhOm4f4jpZB';
+const AT_TABLE  = 'tblbazQDmGCXvtjyp';
+const AT_API    = `https://api.airtable.com/v0/${AT_BASE}/${AT_TABLE}`;
+
+/* ═══════════════════════════════
+   INIT
+═══════════════════════════════ */
+document.getElementById('fecha').value = new Date().toISOString().split('T')[0];
+document.addEventListener('input', actualizarStatus);
+
+/* ═══════════════════════════════
+   PHOTO LOADER
+═══════════════════════════════ */
+const photoFiles = {};
+function loadPhoto(input, slotId, previewId) {
+  const file = input.files[0];
+  if (!file) return;
+  photoFiles[slotId] = file;
+  const reader = new FileReader();
+  reader.onload = e => {
+    const slot = document.getElementById(slotId);
+    const preview = document.getElementById(previewId);
+    preview.src = e.target.result;
+    preview.style.display = 'block';
+    const icon = slot.querySelector('.photo-icon');
+    if(icon) icon.style.display = 'none';
+    slot.classList.add('has-photo');
+  };
+  reader.readAsDataURL(file);
+}
+
+/* ═══════════════════════════════
+   UI HELPERS
+═══════════════════════════════ */
+function toggleCheck(el){ el.classList.toggle('checked'); actualizarStatus(); }
+function toggleBadge(id,type){ document.getElementById('badge-'+id).classList.toggle('active-'+type); }
+function addRow(){
+  const tr = document.createElement('tr');
+  tr.innerHTML = `<td><input type="text" placeholder="Tipo de mercancía"></td><td><input type="number" placeholder="0" style="width:70px"></td><td><input type="text" placeholder="Unidad" style="width:70px"></td><td><input type="text" placeholder="Observaciones"></td><td><button class="del-btn" onclick="delRow(this)">✕</button></td>`;
+  document.getElementById('mercanciasBody').appendChild(tr);
+}
+function delRow(btn){ if(document.querySelectorAll('#mercanciasBody tr').length>1) btn.closest('tr').remove(); }
+function actualizarStatus(){
+  const campos=['fecha','tema','nombrePersona','dpi'];
+  const pct=Math.round(campos.filter(id=>document.getElementById(id).value.trim()).length/campos.length*100);
+  const lbl=document.getElementById('statusLabel');
+  lbl.textContent=pct===100?'Completo ✓':`Completado ${pct}%`;
+  lbl.style.color=pct===100?'var(--success)':'var(--navy-mid)';
+}
+function showToast(msg,type='success'){
+  const t=document.getElementById('toast');
+  t.textContent=(type==='success'?'✓ ':'⚠ ')+msg;
+  t.className=`toast ${type} show`;
+  setTimeout(()=>t.className='toast',4000);
+}
+function limpiarFormulario(){
+  document.querySelectorAll('input:not([type=file]),textarea').forEach(el=>el.value='');
+  document.getElementById('fecha').value=new Date().toISOString().split('T')[0];
+  document.querySelectorAll('.check-item').forEach(el=>el.classList.remove('checked'));
+  document.querySelectorAll('.status-badge').forEach(el=>el.className='status-badge');
+  ['slot-dpi','slot-licencia','slot-pasaporte','slot-vehiculo','slot-vehiculo2'].forEach(id=>{
+    const slot=document.getElementById(id);
+    if(!slot)return;
+    slot.classList.remove('has-photo');
+    const icon=slot.querySelector('.photo-icon');
+    const preview=slot.querySelector('img');
+    if(icon) icon.style.display='';
+    if(preview){preview.style.display='none';preview.src='';}
+    delete photoFiles[id];
+  });
+  actualizarStatus();
+  showToast('Formulario limpiado');
+}
+
+/* ═══════════════════════════════
+   GET DATA
+═══════════════════════════════ */
+function getData(){
+  const incidencias=[...document.querySelectorAll('.check-item.checked')].map(el=>el.querySelector('.check-label').textContent);
+  const mercancias=[...document.querySelectorAll('#mercanciasBody tr')].map(tr=>{
+    const inputs=tr.querySelectorAll('input');
+    return{descripcion:inputs[0]?.value||'',cantidad:inputs[1]?.value||'',unidad:inputs[2]?.value||'',observaciones:inputs[3]?.value||''};
+  }).filter(r=>r.descripcion);
+  return{
+    fecha:document.getElementById('fecha').value,
+    tema:document.getElementById('tema').value,
+    agente:document.getElementById('agente').value,
+    noDocumento:document.getElementById('noDocumento').value,
+    nombrePersona:document.getElementById('nombrePersona').value,
+    dpi:document.getElementById('dpi').value,
+    fechaNacimiento:document.getElementById('fechaNacimiento').value,
+    telefono:document.getElementById('telefono').value,
+    direccion:document.getElementById('direccion').value,
+    placa:document.getElementById('placa').value,
+    marcaModelo:document.getElementById('marcaModelo').value,
+    colorVehiculo:document.getElementById('colorVehiculo').value,
+    incidencias,
+    incautacion:document.getElementById('badge-incautacion').classList.contains('active-warning'),
+    detenidos:document.getElementById('badge-detenidos').classList.contains('active-danger'),
+    numIncautados:document.getElementById('numIncautados').value,
+    numDetenidos:document.getElementById('numDetenidos').value,
+    narracion:document.getElementById('narracion').value,
+    mercancias
+  };
+}
+
+/* ═══════════════════════════════
+   PROGRESS UI
+═══════════════════════════════ */
+function setProgress(pct, steps){
+  document.getElementById('atProgress').style.display='block';
+  document.getElementById('atBar').style.width=pct+'%';
+  const stepsEl=document.getElementById('atSteps');
+  stepsEl.innerHTML=steps.map(s=>`
+    <div class="at-step ${s.state}">
+      <span class="at-step-icon">${s.state==='done'?'✓':s.state==='active'?'⏳':'○'}</span>
+      <span>${s.label}</span>
+    </div>`).join('');
+}
+function setBanner(type,msg){
+  const b=document.getElementById('atBanner');
+  b.className='at-banner '+type;
+  document.getElementById('atBannerMsg').textContent=msg;
+  b.scrollIntoView({behavior:'smooth',block:'nearest'});
+}
+function hideBanner(){ document.getElementById('atBanner').className='at-banner'; }
+
+/* ═══════════════════════════════
+   SUBIR IMAGEN DIRECTO A AIRTABLE
+   Endpoint oficial: POST /v0/{baseId}/{recordId}/{fieldName}/uploadAttachment
+   Body: JSON con file en base64
+   Las fotos van directo al storage
+   privado de tu cuenta Airtable
+═══════════════════════════════ */
+async function uploadPhotoToAirtable(recordId, fieldName, file) {
+  if (!file) return;
+  // Convertir archivo a base64
+  const base64 = await new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = e => resolve(e.target.result.split(',')[1]);
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+  const res = await fetch(
+    `https://api.airtable.com/v0/${AT_BASE}/${recordId}/${encodeURIComponent(fieldName)}/uploadAttachment`,
+    {
+      method: 'POST',
+      headers: {
+        'Authorization': 'Bearer ' + AT_TOKEN,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        contentType: file.type,
+        filename: file.name,
+        file: base64
+      })
+    }
+  );
+  if (!res.ok) {
+    const e = await res.json().catch(() => ({}));
+    throw new Error(`Upload ${fieldName}: ${e.error?.message || res.status}`);
+  }
+}
+
+/* ═══════════════════════════════
+   ENVIAR A AIRTABLE
+   1. Crear registro con todos los campos de texto
+   2. Subir cada foto directamente al registro
+      usando el endpoint privado de Airtable
+═══════════════════════════════ */
+async function enviarAirtable(){
+  const d = getData();
+  if(!d.fecha || !d.nombrePersona){
+    showToast('Complete Fecha y Nombre de la Persona antes de enviar','error');
+    return;
+  }
+
+  const fotosPresentes = Object.keys(photoFiles).filter(k => photoFiles[k]);
+  const totalSteps = 2 + fotosPresentes.length;
+
+  const steps = [
+    {label:'Creando registro con datos del formulario', state:'active'},
+    ...fotosPresentes.map(k => ({
+      label: 'Subiendo ' + {
+        'slot-dpi':'Foto DPI','slot-licencia':'Foto Licencia',
+        'slot-pasaporte':'Foto Pasaporte','slot-vehiculo':'Doc. Vehículo',
+        'slot-vehiculo2':'Foto Vehículo'
+      }[k],
+      state:'pending', slotId: k,
+      fieldName: {
+        'slot-dpi':'Foto DPI','slot-licencia':'Foto Licencia',
+        'slot-pasaporte':'Foto Pasaporte','slot-vehiculo':'Foto Documento Vehiculo',
+        'slot-vehiculo2':'Foto Vehiculo'
+      }[k]
+    })),
+    {label:'Confirmando envío', state:'pending'},
+  ];
+
+  setBanner('loading','Iniciando envío a Airtable...');
+  setProgress(5, steps);
+  document.querySelectorAll('.btn').forEach(b=>b.disabled=true);
+
+  try {
+    // ── PASO 1: crear registro con campos de texto ──
+    setBanner('loading','Creando registro en Airtable...');
+    const fields = {
+      'Fecha':               d.fecha          || '',
+      'Tema':                d.tema           || '',
+      'Agente':              d.agente         || '',
+      'No Documento Agente': d.noDocumento    || '',
+      'Nombre Persona':      d.nombrePersona  || '',
+      'DPI':                 d.dpi            || '',
+      'Fecha Nacimiento':    d.fechaNacimiento|| '',
+      'Telefono':            d.telefono       || '',
+      'Direccion':           d.direccion      || '',
+      'Placa':               d.placa          || '',
+      'Marca Modelo':        d.marcaModelo    || '',
+      'Color Vehiculo':      d.colorVehiculo  || '',
+      'Incidencias':         d.incidencias.join(', ') || '',
+      'Incautacion':         d.incautacion,
+      'Num Incautados':      d.numIncautados ? Number(d.numIncautados) : 0,
+      'Detenidos':           d.detenidos,
+      'Num Detenidos':       d.numDetenidos  ? Number(d.numDetenidos)  : 0,
+      'Narracion':           d.narracion      || '',
+      'Mercancias':          d.mercancias.length > 0
+                               ? d.mercancias.map(m=>`${m.descripcion} (${m.cantidad} ${m.unidad}) - ${m.observaciones}`).join('\n')
+                               : '',
+    };
+
+    console.log('📤 Enviando campos:', JSON.stringify(fields, null, 2));
+    const createRes = await fetch(AT_API, {
+      method: 'POST',
+      headers: { 'Authorization': 'Bearer '+AT_TOKEN, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ fields })
+    });
+    const created = await createRes.json();
+    console.log('📥 Respuesta Airtable:', JSON.stringify(created, null, 2));
+    if (!createRes.ok) throw new Error(created.error?.message || `Error ${createRes.status}: ${JSON.stringify(created)}`);
+
+    const recordId = created.id;
+    steps[0].state = 'done';
+    setProgress(Math.round(100 / totalSteps), steps);
+
+    // ── PASOS 2…N: subir fotos directo a Airtable ──
+    for (let i = 1; i < steps.length - 1; i++) {
+      const step = steps[i];
+      step.state = 'active';
+      setProgress(Math.round(i * 100 / totalSteps), steps);
+      setBanner('loading', `Subiendo ${step.label}...`);
+      try {
+        console.log(`📸 Subiendo ${step.fieldName} para record ${recordId}...`);
+        await uploadPhotoToAirtable(recordId, step.fieldName, photoFiles[step.slotId]);
+        console.log(`✅ ${step.fieldName} subida OK`);
+        step.state = 'done';
+      } catch(photoErr) {
+        console.error(`❌ Error foto ${step.fieldName}:`, photoErr.message);
+        step.label = step.label + ' ⚠ ' + photoErr.message;
+        step.state = 'done';
+      }
+      setProgress(Math.round((i+1) * 100 / totalSteps), steps);
+    }
+
+    // ── ÚLTIMO PASO: confirmar ──
+    steps[steps.length-1].state = 'active';
+    setProgress(98, steps);
+    await new Promise(r=>setTimeout(r,300));
+    steps[steps.length-1].state = 'done';
+    setProgress(100, steps);
+
+    setBanner('success', `✓ Registro enviado correctamente — ID: ${recordId}`);
+    const link = document.createElement('a');
+    link.className = 'at-record-link';
+    link.href = `https://airtable.com/${AT_BASE}/${AT_TABLE}/${recordId}`;
+    link.target = '_blank';
+    link.innerHTML = '🔗 Ver registro en Airtable →';
+    document.getElementById('atBanner').appendChild(link);
+    showToast('Enviado a Airtable exitosamente ✓','success');
+
+  } catch(err) {
+    setBanner('error','Error al enviar: '+err.message);
+    showToast('Error al enviar a Airtable','error');
+    console.error('Airtable error:',err);
+  } finally {
+    document.querySelectorAll('.btn').forEach(b=>b.disabled=false);
+  }
+}
+
+/* ═══════════════════════════════
+   EXPORTAR PDF
+═══════════════════════════════ */
+function exportarPDF(){
+  const{jsPDF}=window.jspdf;
+  const d=getData();
+  const doc=new jsPDF({orientation:'p',unit:'mm',format:'letter'});
+  const navy=[10,22,40],gold=[201,168,76],W=215.9,M=15;
+  doc.setFillColor(...navy);doc.rect(0,0,W,28,'F');
+  doc.setFillColor(...gold);doc.rect(0,28,W,2,'F');
+  doc.setTextColor(255,255,255);doc.setFont('helvetica','bold');doc.setFontSize(16);
+  doc.text('REPORTE DE INSPECCIÓN POLICIAL',W/2,12,{align:'center'});
+  doc.setFontSize(9);doc.setFont('helvetica','normal');doc.setTextColor(201,168,76);
+  doc.text('Documento oficial de registro de incidencias',W/2,20,{align:'center'});
+  let y=36;
+  const sec=t=>{doc.setFillColor(...navy);doc.rect(M,y,W-M*2,7,'F');doc.setTextColor(...gold);doc.setFont('helvetica','bold');doc.setFontSize(9);doc.text(t.toUpperCase(),M+4,y+5);y+=11;doc.setTextColor(30,30,30);doc.setFont('helvetica','normal');doc.setFontSize(10)};
+  const fila=(lbl,val,x2,y2)=>{doc.setFont('helvetica','bold');doc.setFontSize(8.5);doc.setTextColor(80,80,80);doc.text(lbl,x2,y2);doc.setFont('helvetica','normal');doc.setTextColor(20,20,20);doc.setFontSize(10);doc.text(val||'—',x2,y2+5)};
+  sec('1. Datos Generales');fila('Fecha',d.fecha,M,y);fila('No. Documento',d.noDocumento,M+70,y);fila('Agente',d.agente,M+130,y);y+=14;fila('Tema / Asunto',d.tema,M,y);y+=14;
+  sec('2. Datos de la Persona');fila('Nombre',d.nombrePersona,M,y);fila('DPI',d.dpi,M+110,y);y+=14;fila('Fecha Nac.',d.fechaNacimiento,M,y);fila('Teléfono',d.telefono,M+70,y);y+=14;fila('Dirección',d.direccion,M,y);y+=14;
+  sec('3. Vehículo');fila('Placa',d.placa,M,y);fila('Marca/Modelo',d.marcaModelo,M+60,y);fila('Color',d.colorVehiculo,M+130,y);y+=14;
+  if(d.mercancias.length>0){sec('4. Mercancías');const cols=[M,M+75,M+110,M+140];const hdrs=['Descripción','Cantidad','Unidad','Observaciones'];doc.setFillColor(240,243,250);doc.rect(M,y,W-M*2,7,'F');doc.setFont('helvetica','bold');doc.setFontSize(8.5);doc.setTextColor(50,50,100);hdrs.forEach((h,i)=>doc.text(h,cols[i]+2,y+5));y+=9;d.mercancias.forEach((r,ri)=>{if(ri%2===0){doc.setFillColor(248,250,252);doc.rect(M,y-1,W-M*2,7,'F')}doc.setFont('helvetica','normal');doc.setFontSize(9.5);doc.setTextColor(20,20,20);doc.text(r.descripcion.substring(0,30),cols[0]+2,y+4);doc.text(r.cantidad,cols[1]+2,y+4);doc.text(r.unidad,cols[2]+2,y+4);doc.text(r.observaciones.substring(0,20),cols[3]+2,y+4);y+=7});y+=4}
+  sec('5. Incidencias');if(d.incidencias.length>0){doc.setFont('helvetica','bold').setFontSize(9).setTextColor(50,50,100);doc.text('Tipos:',M,y);y+=6;doc.setFont('helvetica','normal').setFontSize(9.5).setTextColor(20,20,20);doc.text('• '+d.incidencias.join('   •  '),M,y);y+=10}
+  if(d.detenidos){doc.setTextColor(180,0,0);doc.setFont('helvetica','bold');doc.text(`⚠ Detenidos: ${d.numDetenidos||'S/D'}`,M,y);y+=7}
+  if(d.incautacion){doc.setTextColor(150,100,0);doc.setFont('helvetica','bold');doc.text(`⚠ Incautación: ${d.numIncautados||'S/D'}`,M,y);y+=7}
+  doc.setTextColor(20,20,20);y+=2;sec('6. Narración');if(d.narracion){doc.setFont('helvetica','normal').setFontSize(9.5).setTextColor(30,30,30);doc.splitTextToSize(d.narracion,W-M*2-4).forEach(line=>{doc.text(line,M,y);y+=6})}else{doc.setTextColor(150,150,150);doc.text('Sin narración.',M,y);y+=8}
+  y=Math.max(y+10,240);doc.setDrawColor(...gold);doc.setLineWidth(0.5);doc.line(M,y,W-M,y);y+=6;doc.setFont('helvetica','normal').setFontSize(8).setTextColor(120,120,120);doc.text(`Generado el ${new Date().toLocaleString('es-GT')}`,M,y);doc.text('Documento Confidencial – Uso Oficial',W-M,y,{align:'right'});
+  doc.save(`reporte_inspeccion_${d.fecha||'sin_fecha'}.pdf`);
+  showToast('PDF generado exitosamente');
+}
+
+/* ═══════════════════════════════
+   EXPORTAR WORD
+═══════════════════════════════ */
+function exportarWord(){
+  const d=getData();
+  const html=`<html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'><head><meta charset='utf-8'><style>body{font-family:Calibri,Arial,sans-serif;font-size:11pt;margin:2cm;color:#1a1a2e}h1{font-size:18pt;font-weight:bold;color:#0a1628;text-align:center;border-bottom:3pt solid #c9a84c;padding-bottom:6pt}h2{font-size:12pt;font-weight:bold;background:#0a1628;color:#e8c97a;padding:4pt 8pt;margin-top:14pt}table{width:100%;border-collapse:collapse;margin:6pt 0}th{background:#12234a;color:#e8c97a;padding:5pt 8pt;font-size:9pt}td{padding:5pt 8pt;border:0.5pt solid #d1d9e8;font-size:10pt}.lbl{font-size:8.5pt;color:#555;font-weight:bold}.val{font-size:11pt}.footer{font-size:8pt;color:#888;margin-top:20pt;border-top:1pt solid #c9a84c;padding-top:6pt}</style></head><body>
+<h1>REPORTE DE INSPECCIÓN POLICIAL</h1>
+<h2>1. DATOS GENERALES</h2><table><tr><td><span class="lbl">Fecha</span><br><span class="val">${d.fecha||'—'}</span></td><td><span class="lbl">No. Documento</span><br><span class="val">${d.noDocumento||'—'}</span></td><td><span class="lbl">Agente</span><br><span class="val">${d.agente||'—'}</span></td></tr><tr><td colspan="3"><span class="lbl">Tema</span><br><span class="val">${d.tema||'—'}</span></td></tr></table>
+<h2>2. PERSONA</h2><table><tr><td colspan="2"><span class="lbl">Nombre</span><br><span class="val">${d.nombrePersona||'—'}</span></td><td><span class="lbl">DPI</span><br><span class="val">${d.dpi||'—'}</span></td></tr><tr><td><span class="lbl">Fecha Nac.</span><br><span class="val">${d.fechaNacimiento||'—'}</span></td><td><span class="lbl">Teléfono</span><br><span class="val">${d.telefono||'—'}</span></td><td><span class="lbl">Dirección</span><br><span class="val">${d.direccion||'—'}</span></td></tr></table>
+<h2>3. VEHÍCULO</h2><table><tr><td><span class="lbl">Placa</span><br><span class="val">${d.placa||'—'}</span></td><td><span class="lbl">Marca/Modelo</span><br><span class="val">${d.marcaModelo||'—'}</span></td><td><span class="lbl">Color</span><br><span class="val">${d.colorVehiculo||'—'}</span></td></tr></table>
+${d.mercancias.length>0?`<h2>4. MERCANCÍAS</h2><table><tr><th>Descripción</th><th>Cantidad</th><th>Unidad</th><th>Observaciones</th></tr>${d.mercancias.map(r=>`<tr><td>${r.descripcion}</td><td>${r.cantidad}</td><td>${r.unidad}</td><td>${r.observaciones}</td></tr>`).join('')}</table>`:''}
+<h2>5. INCIDENCIAS</h2><table><tr><td><span class="lbl">Tipos</span><br><span class="val">${d.incidencias.join(', ')||'Ninguna'}</span></td><td><span class="lbl">Incautación</span><br><span class="val">${d.incautacion?'Sí ('+d.numIncautados+')':'No'}</span></td><td><span class="lbl">Detenidos</span><br><span class="val">${d.detenidos?'Sí ('+d.numDetenidos+')':'No'}</span></td></tr></table>
+<h2>6. NARRACIÓN</h2><p style="font-size:10.5pt;line-height:1.6;padding:6pt;border:0.5pt solid #d1d9e8">${d.narracion||'Sin narración.'}</p>
+<p class="footer">Generado el ${new Date().toLocaleString('es-GT')} | Documento Confidencial</p></body></html>`;
+  const blob=new Blob(['\ufeff',html],{type:'application/msword'});
+  const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=`reporte_${d.fecha||'sin_fecha'}.doc`;a.click();
+  showToast('Word generado exitosamente');
+}
+
+/* ═══════════════════════════════
+   EXPORTAR EXCEL
+═══════════════════════════════ */
+function exportarExcel(){
+  const d=getData();
+  const wb=XLSX.utils.book_new();
+  const rows=[['REPORTE DE INSPECCIÓN POLICIAL','','',''],[''],['DATOS GENERALES','','',''],['Fecha',d.fecha,'No. Documento',d.noDocumento],['Agente',d.agente,'Tema',d.tema],[''],['DATOS PERSONA','','',''],['Nombre',d.nombrePersona,'DPI',d.dpi],['Fecha Nac.',d.fechaNacimiento,'Teléfono',d.telefono],['Dirección',d.direccion,'',''],[''],['VEHÍCULO','','',''],['Placa',d.placa,'Marca/Modelo',d.marcaModelo],['Color',d.colorVehiculo,'',''],[''],['INCIDENCIAS','','',''],['Tipos',d.incidencias.join(', ')||'—','',''],['Incautación',d.incautacion?`Sí (${d.numIncautados})`:'No','Detenidos',d.detenidos?`Sí (${d.numDetenidos})`:'No'],[''],['NARRACIÓN','','',''],[(d.narracion||'—'),'','','']];
+  const ws=XLSX.utils.aoa_to_sheet(rows);ws['!cols']=[{wch:20},{wch:30},{wch:20},{wch:30}];
+  XLSX.utils.book_append_sheet(wb,ws,'Reporte');
+  if(d.mercancias.length>0){const ws2=XLSX.utils.aoa_to_sheet([['Descripción','Cantidad','Unidad','Observaciones'],...d.mercancias.map(r=>[r.descripcion,r.cantidad,r.unidad,r.observaciones])]);ws2['!cols']=[{wch:30},{wch:12},{wch:12},{wch:30}];XLSX.utils.book_append_sheet(wb,ws2,'Mercancías')}
+  XLSX.writeFile(wb,`reporte_${d.fecha||'sin_fecha'}.xlsx`);
+  showToast('Excel generado exitosamente');
+}
+
+actualizarStatus();
+</script>
+</body>
+</html>
