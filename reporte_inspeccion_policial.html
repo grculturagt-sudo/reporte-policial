@@ -369,6 +369,10 @@ const AT_BASE   = 'appr1hXhOm4f4jpZB';
 const AT_TABLE  = 'tblbazQDmGCXvtjyp';
 const AT_API    = `https://api.airtable.com/v0/${AT_BASE}/${AT_TABLE}`;
 
+// Google Drive config
+const GD_API_KEY   = 'AIzaSyALCKms2eXkZ76IwdVLit2HpUjdaNkm9IU';
+const GD_FOLDER_ID = '1UyByq23XFuvR57S1zdBFPhFB2_iFZaZH';
+
 /* ═══════════════════════════════
    INIT
 ═══════════════════════════════ */
@@ -493,41 +497,68 @@ function setBanner(type,msg){
 function hideBanner(){ document.getElementById('atBanner').className='at-banner'; }
 
 /* ═══════════════════════════════
-   SUBIR IMAGEN DIRECTO A AIRTABLE
-   Endpoint oficial: POST /v0/{baseId}/{recordId}/{fieldName}/uploadAttachment
-   Body: JSON con file en base64
-   Las fotos van directo al storage
-   privado de tu cuenta Airtable
+   SUBIR FOTO A GOOGLE DRIVE
+   Las fotos van al folder privado
+   de tu Google Drive. Solo quienes
+   tengan el link pueden verlas.
+   El link se guarda en Airtable.
 ═══════════════════════════════ */
-async function uploadPhotoToAirtable(recordId, fieldName, file) {
-  if (!file) return;
-  // Convertir archivo a base64
+async function uploadPhotoToDrive(file, label) {
+  if (!file) return null;
+  // Convertir a base64
   const base64 = await new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onload = e => resolve(e.target.result.split(',')[1]);
     reader.onerror = reject;
     reader.readAsDataURL(file);
   });
+  // Subir a Google Drive via multipart upload
+  const metadata = JSON.stringify({
+    name: label + '_' + new Date().toISOString().slice(0,10) + '_' + file.name,
+    parents: [GD_FOLDER_ID]
+  });
+  const boundary = 'foto_boundary_' + Date.now();
+  const body = [
+    '--' + boundary,
+    'Content-Type: application/json; charset=UTF-8',
+    '',
+    metadata,
+    '--' + boundary,
+    'Content-Type: ' + file.type,
+    'Content-Transfer-Encoding: base64',
+    '',
+    base64,
+    '--' + boundary + '--'
+  ].join('\r\n');
+
   const res = await fetch(
-    `https://api.airtable.com/v0/${AT_BASE}/${recordId}/${encodeURIComponent(fieldName)}/uploadAttachment`,
+    `https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&key=${GD_API_KEY}`,
     {
       method: 'POST',
-      headers: {
-        'Authorization': 'Bearer ' + AT_TOKEN,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        contentType: file.type,
-        filename: file.name,
-        file: base64
-      })
+      headers: { 'Content-Type': `multipart/related; boundary=${boundary}` },
+      body: body
     }
   );
   if (!res.ok) {
     const e = await res.json().catch(() => ({}));
-    throw new Error(`Upload ${fieldName}: ${e.error?.message || res.status}`);
+    throw new Error(`Drive upload ${label}: ${e.error?.message || res.status}`);
   }
+  const data = await res.json();
+  // Hacer el archivo accesible con el link (no público, solo con link)
+  await fetch(
+    `https://www.googleapis.com/drive/v3/files/${data.id}/permissions?key=${GD_API_KEY}`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ role: 'reader', type: 'anyone' })
+    }
+  );
+  const driveUrl = `https://drive.google.com/file/d/${data.id}/view`;
+  console.log(`✅ ${label} subida a Drive: ${driveUrl}`);
+  return driveUrl;
 }
+
+async function loadFieldIds() {} // no se necesita con Drive
 
 /* ═══════════════════════════════
    ENVIAR A AIRTABLE
@@ -608,16 +639,16 @@ async function enviarAirtable(){
     steps[0].state = 'done';
     setProgress(Math.round(100 / totalSteps), steps);
 
-    // ── PASOS 2…N: subir fotos directo a Airtable ──
+    // ── PASOS 2…N: subir fotos a Google Drive y guardar links en Airtable ──
+    const driveLinks = {};
     for (let i = 1; i < steps.length - 1; i++) {
       const step = steps[i];
       step.state = 'active';
       setProgress(Math.round(i * 100 / totalSteps), steps);
-      setBanner('loading', `Subiendo ${step.label}...`);
+      setBanner('loading', `Subiendo ${step.label} a Google Drive...`);
       try {
-        console.log(`📸 Subiendo ${step.fieldName} para record ${recordId}...`);
-        await uploadPhotoToAirtable(recordId, step.fieldName, photoFiles[step.slotId]);
-        console.log(`✅ ${step.fieldName} subida OK`);
+        const link = await uploadPhotoToDrive(photoFiles[step.slotId], step.fieldName);
+        if (link) driveLinks[step.fieldName] = link;
         step.state = 'done';
       } catch(photoErr) {
         console.error(`❌ Error foto ${step.fieldName}:`, photoErr.message);
@@ -625,6 +656,20 @@ async function enviarAirtable(){
         step.state = 'done';
       }
       setProgress(Math.round((i+1) * 100 / totalSteps), steps);
+    }
+    // Actualizar registro con links de Drive si hay fotos
+    if (Object.keys(driveLinks).length > 0) {
+      const linkFields = {};
+      if (driveLinks['Foto DPI'])                 linkFields['Foto DPI']                = driveLinks['Foto DPI'];
+      if (driveLinks['Foto Licencia'])             linkFields['Foto Licencia']           = driveLinks['Foto Licencia'];
+      if (driveLinks['Foto Pasaporte'])            linkFields['Foto Pasaporte']          = driveLinks['Foto Pasaporte'];
+      if (driveLinks['Foto Documento Vehiculo'])   linkFields['Foto Documento Vehiculo'] = driveLinks['Foto Documento Vehiculo'];
+      if (driveLinks['Foto Vehiculo'])             linkFields['Foto Vehiculo']           = driveLinks['Foto Vehiculo'];
+      await fetch(`${AT_API}/${recordId}`, {
+        method: 'PATCH',
+        headers: { 'Authorization': 'Bearer '+AT_TOKEN, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ fields: linkFields })
+      });
     }
 
     // ── ÚLTIMO PASO: confirmar ──
@@ -715,6 +760,7 @@ function exportarExcel(){
   showToast('Excel generado exitosamente');
 }
 
+loadFieldIds();
 actualizarStatus();
 </script>
 </body>
