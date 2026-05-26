@@ -493,40 +493,62 @@ function setBanner(type,msg){
 function hideBanner(){ document.getElementById('atBanner').className='at-banner'; }
 
 /* ═══════════════════════════════
+   FIELD IDs — se cargan al inicio
+   El endpoint uploadAttachment requiere
+   el ID del campo, no el nombre
+═══════════════════════════════ */
+let fieldIds = {};
+
+async function loadFieldIds() {
+  try {
+    const res = await fetch(`https://api.airtable.com/v0/meta/bases/${AT_BASE}/tables`, {
+      headers: { 'Authorization': 'Bearer ' + AT_TOKEN }
+    });
+    const data = await res.json();
+    const table = data.tables?.find(t => t.id === AT_TABLE);
+    if (table) {
+      table.fields.forEach(f => { fieldIds[f.name] = f.id; });
+      console.log('✅ Field IDs cargados:', fieldIds);
+    }
+  } catch(e) {
+    console.warn('No se pudieron cargar field IDs:', e);
+  }
+}
+
+/* ═══════════════════════════════
    SUBIR IMAGEN DIRECTO A AIRTABLE
-   Endpoint oficial: POST /v0/{baseId}/{recordId}/{fieldName}/uploadAttachment
+   Endpoint oficial: POST /v0/{baseId}/{recordId}/{fieldId}/uploadAttachment
    Body: JSON con file en base64
-   Las fotos van directo al storage
-   privado de tu cuenta Airtable
 ═══════════════════════════════ */
 async function uploadPhotoToAirtable(recordId, fieldName, file) {
   if (!file) return;
-  // Convertir archivo a base64
+  const fieldRef = fieldIds[fieldName] || fieldName;
+  console.log(`📸 Upload ${fieldName} → fieldRef: ${fieldRef}`);
   const base64 = await new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onload = e => resolve(e.target.result.split(',')[1]);
     reader.onerror = reject;
     reader.readAsDataURL(file);
   });
-  const res = await fetch(
-    `https://api.airtable.com/v0/${AT_BASE}/${recordId}/${encodeURIComponent(fieldName)}/uploadAttachment`,
-    {
-      method: 'POST',
-      headers: {
-        'Authorization': 'Bearer ' + AT_TOKEN,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        contentType: file.type,
-        filename: file.name,
-        file: base64
-      })
-    }
-  );
+  const url = `https://api.airtable.com/v0/${AT_BASE}/${recordId}/${encodeURIComponent(fieldRef)}/uploadAttachment`;
+  console.log('📤 URL:', url);
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: {
+      'Authorization': 'Bearer ' + AT_TOKEN,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      contentType: file.type,
+      filename: file.name,
+      file: base64
+    })
+  });
   if (!res.ok) {
     const e = await res.json().catch(() => ({}));
     throw new Error(`Upload ${fieldName}: ${e.error?.message || res.status}`);
   }
+  console.log(`✅ ${fieldName} subida OK`);
 }
 
 /* ═══════════════════════════════
@@ -715,6 +737,7 @@ function exportarExcel(){
   showToast('Excel generado exitosamente');
 }
 
+loadFieldIds();
 actualizarStatus();
 </script>
 </body>
