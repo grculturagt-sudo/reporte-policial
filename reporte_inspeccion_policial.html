@@ -357,6 +357,7 @@
 <div class="toast" id="toast"></div>
 
 <!-- LIBS -->
+<script src="https://accounts.google.com/gsi/client" async defer></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 
@@ -370,8 +371,9 @@ const AT_TABLE  = 'tblbazQDmGCXvtjyp';
 const AT_API    = `https://api.airtable.com/v0/${AT_BASE}/${AT_TABLE}`;
 
 // Google Drive config
-const GD_API_KEY   = 'AIzaSyALCKms2eXkZ76IwdVLit2HpUjdaNkm9IU';
+const GD_CLIENT_ID = '159339752779-3q49p7ehmjv9doscp0onquh2c4inc95k.apps.googleusercontent.com';
 const GD_FOLDER_ID = '1UyByq23XFuvR57S1zdBFPhFB2_iFZaZH';
+let gdToken = null;
 
 /* ═══════════════════════════════
    INIT
@@ -497,68 +499,59 @@ function setBanner(type,msg){
 function hideBanner(){ document.getElementById('atBanner').className='at-banner'; }
 
 /* ═══════════════════════════════
-   SUBIR FOTO A GOOGLE DRIVE
-   Las fotos van al folder privado
-   de tu Google Drive. Solo quienes
-   tengan el link pueden verlas.
-   El link se guarda en Airtable.
+   GOOGLE DRIVE OAUTH
+   El usuario hace login una vez
+   y el token se usa para subir fotos
+   directamente a su Drive privado
 ═══════════════════════════════ */
-async function uploadPhotoToDrive(file, label) {
-  if (!file) return null;
-  // Convertir a base64
-  const base64 = await new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = e => resolve(e.target.result.split(',')[1]);
-    reader.onerror = reject;
-    reader.readAsDataURL(file);
-  });
-  // Subir a Google Drive via multipart upload
-  const metadata = JSON.stringify({
-    name: label + '_' + new Date().toISOString().slice(0,10) + '_' + file.name,
-    parents: [GD_FOLDER_ID]
-  });
-  const boundary = 'foto_boundary_' + Date.now();
-  const body = [
-    '--' + boundary,
-    'Content-Type: application/json; charset=UTF-8',
-    '',
-    metadata,
-    '--' + boundary,
-    'Content-Type: ' + file.type,
-    'Content-Transfer-Encoding: base64',
-    '',
-    base64,
-    '--' + boundary + '--'
-  ].join('\r\n');
-
-  const res = await fetch(
-    `https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&key=${GD_API_KEY}`,
-    {
-      method: 'POST',
-      headers: { 'Content-Type': `multipart/related; boundary=${boundary}` },
-      body: body
+function getGoogleToken() {
+  return new Promise((resolve, reject) => {
+    if (gdToken) { resolve(gdToken); return; }
+    // Usar Google Identity Services (GIS) para obtener token
+    if (!window.google?.accounts?.oauth2) {
+      reject(new Error('Google Identity Services no cargado'));
+      return;
     }
-  );
-  if (!res.ok) {
-    const e = await res.json().catch(() => ({}));
-    throw new Error(`Drive upload ${label}: ${e.error?.message || res.status}`);
-  }
-  const data = await res.json();
-  // Hacer el archivo accesible con el link (no público, solo con link)
-  await fetch(
-    `https://www.googleapis.com/drive/v3/files/${data.id}/permissions?key=${GD_API_KEY}`,
-    {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ role: 'reader', type: 'anyone' })
-    }
-  );
-  const driveUrl = `https://drive.google.com/file/d/${data.id}/view`;
-  console.log(`✅ ${label} subida a Drive: ${driveUrl}`);
-  return driveUrl;
+    const client = google.accounts.oauth2.initTokenClient({
+      client_id: GD_CLIENT_ID,
+      scope: 'https://www.googleapis.com/auth/drive.file',
+      callback: (resp) => {
+        if (resp.error) { reject(new Error(resp.error)); return; }
+        gdToken = resp.access_token;
+        resolve(gdToken);
+      }
+    });
+    client.requestAccessToken();
+  });
 }
 
-async function loadFieldIds() {} // no se necesita con Drive
+async function uploadPhotoToDrive(file, label) {
+  if (!file) return null;
+  const token = await getGoogleToken();
+  const metadata = { name: label + '_' + new Date().toISOString().slice(0,10) + '_' + file.name, parents: [GD_FOLDER_ID] };
+  const form = new FormData();
+  form.append('metadata', new Blob([JSON.stringify(metadata)], {type:'application/json'}));
+  form.append('file', file);
+  const res = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', {
+    method: 'POST',
+    headers: { 'Authorization': 'Bearer ' + token },
+    body: form
+  });
+  if (!res.ok) {
+    const e = await res.json().catch(()=>({}));
+    throw new Error(`Drive ${label}: ${e.error?.message || res.status}`);
+  }
+  const data = await res.json();
+  // Compartir solo con link (no indexable)
+  await fetch(`https://www.googleapis.com/drive/v3/files/${data.id}/permissions`, {
+    method: 'POST',
+    headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ role: 'reader', type: 'anyone' })
+  });
+  return `https://drive.google.com/file/d/${data.id}/view`;
+}
+
+async function loadFieldIds() {}
 
 /* ═══════════════════════════════
    ENVIAR A AIRTABLE
